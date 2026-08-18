@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的仪表盘</title>
+<style>
+  /* 深色 (默认) */
+  :root {
+    --bg: #0d1117; --card: #161b22; --border: #30363d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --stat-bg: rgba(255,255,255,.04); --bar-bg: rgba(255,255,255,.08);
+    --purple: #bc8cff;
+  }
+  /* 浅色 */
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #ffffff; --card: #f6f8fa; --border: #d0d7de;
+      --text: #1f2328; --dim: #656d76; --accent: #0969da;
+      --green: #1a7f37; --red: #cf222e; --yellow: #9a6700;
+      --stat-bg: rgba(9,30,66,.05); --bar-bg: rgba(9,30,66,.08);
+      --purple: #8250df;
+    }
+  }
+  /* 手动切到深色 */
+  :root[data-theme="dark"] {
+    --bg: #0d1117; --card: #161b22; --border: #30363d;
+    --text: #e6edf3; --dim: #8b949e; --accent: #58a6ff;
+    --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    --stat-bg: rgba(255,255,255,.04); --bar-bg: rgba(255,255,255,.08);
+    --purple: #bc8cff;
+  }
+  /* 手动切到浅色 */
+  :root[data-theme="light"] {
+    --bg: #ffffff; --card: #f6f8fa; --border: #d0d7de;
+    --text: #1f2328; --dim: #656d76; --accent: #0969da;
+    --green: #1a7f37; --red: #cf222e; --yellow: #9a6700;
+    --stat-bg: rgba(9,30,66,.05); --bar-bg: rgba(9,30,66,.08);
+    --purple: #8250df;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    padding: 24px; max-width: 1200px; margin: 0 auto;
+    transition: background .2s, color .2s;
+  }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  h1 { font-size: 24px; font-weight: 700; }
+  .sub { color: var(--dim); font-size: 13px; margin-top: 4px; }
+  .badge { font-size: 12px; color: var(--dim); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; }
+  .theme-btn {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+    transition: background .2s;
+  }
+  .theme-btn:hover { background: var(--bar-bg); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px; display: flex; flex-direction: column; gap: 10px;
+    transition: background .2s, border-color .2s;
+  }
+  .card h2 { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+  .card .desc { color: var(--dim); font-size: 12.5px; line-height: 1.5; }
+  .stats { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 70px; background: var(--stat-bg); border-radius: 8px; padding: 10px 12px; }
+  .stat .num { font-size: 20px; font-weight: 700; }
+  .stat .label { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .num.green { color: var(--green); } .num.red { color: var(--red); } .num.accent { color: var(--accent); } .num.yellow { color: var(--yellow); }
+  .bar { height: 6px; background: var(--bar-bg); border-radius: 3px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--accent); border-radius: 3px; }
+  .err { color: var(--red); font-size: 12.5px; }
+  .pr { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .pr:last-child { border-bottom: none; }
+  .pr .t { font-size: 13.5px; }
+  .pr .meta { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .pill { font-size: 11px; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .pill.open { background: rgba(63,185,80,.15); color: var(--green); }
+  .pill.closed { background: rgba(139,148,158,.15); color: var(--dim); }
+  .pill.merged { background: rgba(130,80,223,.25); color: var(--purple); }
+  .pill.error { background: rgba(248,81,73,.15); color: var(--red); }
+  .serv { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+  .footer { color: var(--dim); font-size: 12px; margin-top: 24px; text-align: center; }
+  .spark { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin-top: 4px; }
+  .spark i { flex: 1; background: var(--accent); opacity: .55; border-radius: 2px 2px 0 0; min-height: 2px; }
+  .spark i:last-child { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>📊 我的仪表盘</h1>
+    <div class="sub" id="sub">加载中…</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge" id="badge">—</span>
+    <button class="theme-btn" id="themeBtn" title="切换深浅色">🌙</button>
+  </div>
+</header>
+
+<h2 style="font-size:15px;margin-bottom:10px;color:var(--dim)">🚀 GitHub 项目</h2>
+<div class="grid" id="projects"><div class="card">加载中…</div></div>
+
+<h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🔄 Pull Requests</h2>
+<div class="grid"><div class="card" id="prs">加载中…</div></div>
+
+<h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🖥️ 服务器 (ECS)</h2>
+<div class="grid"><div class="card" id="server">加载中…</div></div>
+
+<div class="footer">自动刷新 · 数据来自 GitHub API (10 分钟缓存) 与本地监控</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let gCacheMs = 600000;
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 60) return '刚刚';
+  if (s < 3600) return Math.floor(s/60) + ' 分钟前';
+  if (s < 86400) return Math.floor(s/3600) + ' 小时前';
+  return Math.floor(s/86400) + ' 天前';
+}
+
+function statCard(num, label, cls) {
+  return `<div class="stat"><div class="num ${cls||''}">${num}</div><div class="label">${esc(label)}</div></div>`;
+}
+function sparkline(days) {
+  if (!days || !days.length) return '';
+  const max = Math.max(1, ...days.map(d => d.count));
+  return `<div class="spark">${days.map((d,i) =>
+    `<i style="height:${Math.max(3, Math.round(d.count/max*100))}%" title="${esc(d.day)}: ${d.count} 次"></i>`).join('')}</div>`;
+}
+
+function renderProjects(list) {
+  $('projects').innerHTML = list.map(p => {
+    const err = p.error ? `<div class="err">⚠️ ${esc(p.error)}</div>` : '';
+    const d = p.data || {};
+    const cls = p.error ? 'error' : 'merged';
+    return `<div class="card">
+      <h2>${p.icon || '📦'} <a href="${esc(p.url)}" target="_blank" style="color:var(--text);text-decoration:none">${esc(p.name)}</a></h2>
+      <div class="desc">${esc(p.desc || '')}</div>
+      ${err || `<div class="stats">
+        ${statCard(d.stars ?? '—', 'Star', 'accent')}
+        ${statCard(d.forks ?? '—', 'Fork')}
+        ${statCard(d.views14d ?? '—', '浏览 14d')}
+        ${statCard(d.clones14d ?? '—', 'Clone 14d')}
+      </div>
+      <div class="desc">👀 独立访客: <b>${d.viewsUniques ?? '—'}</b> · 独立克隆: <b>${d.clonesUniques ?? '—'}</b> · 近 7 天浏览趋势:</div>
+      ${sparkline(d.viewsDaily)}`}
+    </div>`;
+  }).join('');
+}
+
+function renderPRs(list) {
+  $('prs').innerHTML = list.map(p => {
+    const d = p.data || {};
+    let pill = `<span class="pill ${p.error ? 'error' : d.merged ? 'merged' : d.state}">${p.error ? 'API 错误' : d.merged ? '已合并' : d.state === 'open' ? 'Open' : '已关闭'}</span>`;
+    const meta = p.error ? '' : d.mergedAt ? `合并于 ${timeAgo(d.mergedAt)}` : d.state === 'open' ? `${d.comments ?? 0} 评论 · ${d.reviews ?? 0} review` : '';
+    return `<div class="pr">
+      <div><div class="t"><a href="${esc(p.url)}" target="_blank" style="color:var(--text);text-decoration:none">${esc(p.name)}</a></div>
+      <div class="meta">${esc(p.repo)} #${p.num}${meta ? ' · ' + meta : ''}</div></div>
+      ${pill}
+    </div>`;
+  }).join('');
+}
+
+function renderServer(s) {
+  const memCls = s.mem.pct > 85 ? 'red' : s.mem.pct > 60 ? 'yellow' : 'green';
+  const diskCls = s.disk.pct > 85 ? 'red' : s.disk.pct > 60 ? 'yellow' : 'green';
+  $('server').innerHTML = `
+    <div class="serv">
+      ${statCard(s.hostname, '主机', 'accent')}
+      ${statCard(s.uptime, '运行时长')}
+      ${statCard(s.load1 + ' / ' + s.load5, '负载 1m / 5m')}
+      ${statCard(s.cores + ' 核', 'CPU')}
+    </div>
+    <div class="stats">
+      ${statCard(s.mem.pct + '%', '内存 ' + s.mem.usedMB + 'MB / ' + s.mem.totalMB + 'MB', memCls)}
+      ${statCard(s.disk.pct + '%', '磁盘 ' + s.disk.usedGB + 'G / ' + s.disk.totalGB + 'G', diskCls)}
+    </div>
+    <div class="bar"><div style="width:${s.mem.pct}%;background:${memCls==='green'?'var(--green)':memCls==='yellow'?'var(--yellow)':'var(--red)'}"></div></div>
+    <div class="bar"><div style="width:${s.disk.pct}%;background:${diskCls==='green'?'var(--green)':diskCls==='yellow'?'var(--yellow)':'var(--red)'}"></div></div>`;
+}
+
+async function load() {
+  try {
+    // 动态计算 API 基路径: 兼容 /dashboard/ 和 /dashboard 两种访问方式
+    const apiBase = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
+    const r = await fetch(apiBase + 'api/data', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    gCacheMs = d.cacheMs || 600000;
+    $('sub').textContent = 'GitHub 数据更新于 ' + timeAgo(d.github.fetchedAt) + ' · 服务器 ' + new Date(d.server.time).toLocaleString('zh-CN');
+    $('badge').textContent = '⭐ ' + d.github.projects.reduce((a,p) => a + (p.data?.stars || 0), 0) + ' · 👀 ' + d.github.projects.reduce((a,p) => a + (p.data?.viewsUniques || 0), 0);
+    renderProjects(d.github.projects);
+    renderPRs(d.github.prs);
+    renderServer(d.server);
+  } catch (e) {
+    $('sub').textContent = '加载失败: ' + e.message;
+  }
+}
+load();
+setInterval(load, 60000);
+
+// ---------- 深浅色模式 ----------
+const themeBtn = document.getElementById('themeBtn');
+const saved = localStorage.getItem('dash-theme');
+if (saved) document.documentElement.setAttribute('data-theme', saved);
+function updateThemeBtn() {
+  const cur = document.documentElement.getAttribute('data-theme');
+  themeBtn.textContent = (cur === 'light') ? '🌙' : (cur === 'dark' ? '☀️' : '🌓');
+}
+updateThemeBtn();
+themeBtn.addEventListener('click', () => {
+  const cur = document.documentElement.getAttribute('data-theme');
+  let next;
+  if (!cur) next = (matchMedia('(prefers-color-scheme: light)').matches) ? 'dark' : 'light';
+  else next = cur === 'light' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('dash-theme', next);
+  updateThemeBtn();
+});
+// 跟随系统切换 (仅在用户未手动选择时)
+matchMedia('(prefers-color-scheme: light)').addEventListener('change', e => {
+  if (!localStorage.getItem('dash-theme')) updateThemeBtn();
+});
+</script>
+</body>
+</html>
