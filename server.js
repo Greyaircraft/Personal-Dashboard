@@ -23,41 +23,67 @@ const CACHE_MS = parseInt(process.env.CACHE_MS || '600000', 10);
 const GH_TOKEN = process.env.GH_TOKEN || '';
 const GH_API = 'https://api.github.com';
 
-// ---------- 配置: 要监控的项目和 PR ----------
-const PROJECTS = [
+// ---------- 配置: 可监控的全部项目 (前端可选择) ----------
+const ALL_PROJECTS = [
   {
     repo: 'Greyaircraft/PowerToysRun-PoetSearch',
     name: 'PoetSearch 插件',
+    nameEn: 'PoetSearch Plugin',
     desc: 'PowerToys Run 古诗词搜索 · 78,581 首',
+    descEn: 'PowerToys Run classical Chinese poetry search · 78,581 poems',
     url: 'https://github.com/Greyaircraft/PowerToysRun-PoetSearch',
-    icon: '📜'
+    icon: '📜',
+    key: 'poetsearch'
   },
   {
     repo: 'Greyaircraft/QuickAi-Plus',
     name: 'QuickAi-Plus',
+    nameEn: 'QuickAi-Plus',
     desc: 'QuickAI 插件改造版 · LaTeX + Markdown 渲染 + 多 AI 预设',
+    descEn: 'QuickAI mod · LaTeX + Markdown rendering + multiple AI presets',
     url: 'https://github.com/Greyaircraft/QuickAi-Plus',
-    icon: '⚡'
+    icon: '⚡',
+    key: 'quickai'
+  },
+  {
+    repo: 'Greyaircraft/Personal-Dashboard',
+    name: 'Personal-Dashboard',
+    nameEn: 'Personal-Dashboard',
+    desc: '本项目 · 个人仪表盘',
+    descEn: 'This project · personal dashboard',
+    url: 'https://github.com/Greyaircraft/Personal-Dashboard',
+    icon: '📊',
+    key: 'dashboard'
   }
 ];
+
+// 动态: 要拉取的项目 (支持从查询参数 /api/data?projects=key1,key2 过滤)
+function selectedProjects(q) {
+  if (!q) return ALL_PROJECTS;
+  const keys = q.split(',').map(s => s.trim()).filter(Boolean);
+  return ALL_PROJECTS.filter(p => keys.includes(p.key));
+}
 
 const PRS = [
   {
     repo: 'microsoft/PowerToys',
     num: 49946,
     name: 'PoetSearch 收录进官方列表',
+    nameEn: 'PoetSearch added to official list',
     url: 'https://github.com/microsoft/PowerToys/pull/49946'
   },
   {
     repo: 'ruslanlap/PowerToysRun-QuickAi',
     num: 31,
     name: 'QuickAI 多 AI 预设',
+    nameEn: 'QuickAI multiple AI presets',
     url: 'https://github.com/ruslanlap/PowerToysRun-QuickAi/pull/31'
   },
   {
     repo: 'ruslanlap/PowerToysRun-QuickAi',
     num: 26,
     name: 'QuickAI LaTeX + Markdown 渲染',
+    nameEn: 'QuickAI LaTeX + Markdown rendering',
     url: 'https://github.com/ruslanlap/PowerToysRun-QuickAi/pull/26'
   }
 ];
@@ -110,9 +136,10 @@ async function fetchPR(pr) {
   };
 }
 
-async function refreshGitHub() {
+async function refreshGitHub(projects) {
+  const list = projects || ALL_PROJECTS;
   const results = { projects: [], prs: [], fetchedAt: new Date().toISOString() };
-  for (const p of PROJECTS) {
+  for (const p of list) {
     try { results.projects.push({ ...p, data: await fetchRepo(p.repo) }); }
     catch (e) { results.projects.push({ ...p, error: String(e.message || e) }); }
   }
@@ -171,7 +198,30 @@ const server = http.createServer((req, res) => {
     return;
   }
   if (url === '/api/data') {
-    const body = JSON.stringify({ github: ghCache || { projects: [], prs: [], fetchedAt: null }, server: serverStatus(), cacheMs: CACHE_MS });
+    // 支持 ?projects=key1,key2 过滤
+    const q = new URL(req.url, 'http://x').searchParams.get('projects');
+    const list = selectedProjects(q);
+    let projects = [], prs = [], fetchedAt = null;
+    if (ghCache) {
+      if (q && list.length) {
+        projects = ghCache.projects.filter(cp => list.some(p => p.key === cp.key));
+      } else {
+        projects = ghCache.projects;
+      }
+      prs = ghCache.prs;
+      fetchedAt = ghCache.fetchedAt;
+      // 缓存缺选中项 → 后台全量补刷 (本次先返回已有)
+      if (q && list.length && projects.length < list.length) refreshGitHub();
+    } else {
+      refreshGitHub(q && list.length ? list : undefined); // 首次: 后台刷
+    }
+    const body = JSON.stringify({ github: { projects, prs, fetchedAt }, server: serverStatus(), cacheMs: CACHE_MS });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(body);
+    return;
+  }
+  if (url === '/api/projects') {
+    const body = JSON.stringify(ALL_PROJECTS.map(({ repo, name, nameEn, key, icon }) => ({ repo, name, nameEn, key, icon })));
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(body);
     return;

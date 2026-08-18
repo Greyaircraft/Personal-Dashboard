@@ -86,34 +86,98 @@
   .spark { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin-top: 4px; }
   .spark i { flex: 1; background: var(--accent); opacity: .55; border-radius: 2px 2px 0 0; min-height: 2px; }
   .spark i:last-child { opacity: 1; }
+  .picker { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .picker .label { color: var(--dim); font-size: 13px; }
+  .chip {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 999px; padding: 6px 14px; font-size: 13px; cursor: pointer;
+    transition: all .15s; user-select: none;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .lang-btn {
+    background: var(--card); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .lang-btn:hover { background: var(--bar-bg); }
+  .i18n[data-i18n] { transition: opacity .15s; }
 </style>
 </head>
 <body>
 <header>
   <div>
-    <h1>📊 我的仪表盘</h1>
+    <h1>📊 <span data-i18n="title">我的仪表盘</span></h1>
     <div class="sub" id="sub">加载中…</div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
+    <button class="lang-btn" id="langBtn" title="EN/中文">EN</button>
     <span class="badge" id="badge">—</span>
     <button class="theme-btn" id="themeBtn" title="切换深浅色">🌙</button>
   </div>
 </header>
 
-<h2 style="font-size:15px;margin-bottom:10px;color:var(--dim)">🚀 GitHub 项目</h2>
+<div class="picker">
+  <span class="label" data-i18n="monitor">监控项目</span>
+  <div id="chips">加载中…</div>
+</div>
+
+<h2 style="font-size:15px;margin-bottom:10px;color:var(--dim)">🚀 <span data-i18n="ghProjects">GitHub 项目</span></h2>
 <div class="grid" id="projects"><div class="card">加载中…</div></div>
 
-<h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🔄 Pull Requests</h2>
+<h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🔄 <span data-i18n="prs">Pull Requests</span></h2>
 <div class="grid"><div class="card" id="prs">加载中…</div></div>
 
-<h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🖥️ 服务器 (ECS)</h2>
+<h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🖥️ <span data-i18n="server">服务器 (ECS)</span></h2>
 <div class="grid"><div class="card" id="server">加载中…</div></div>
 
-<div class="footer">自动刷新 · 数据来自 GitHub API (10 分钟缓存) 与本地监控</div>
+<div class="footer" data-i18n="footer">自动刷新 · 数据来自 GitHub API (10 分钟缓存) 与本地监控</div>
 
 <script>
 const $ = id => document.getElementById(id);
 let gCacheMs = 600000;
+let LANG = localStorage.getItem('dash-lang') || 'zh';
+let selectedKeys = null;
+
+// ---------- i18n ----------
+const I18N = {
+  zh: {
+    title: '我的仪表盘', monitor: '监控项目', ghProjects: 'GitHub 项目',
+    prs: 'Pull Requests', server: '服务器 (ECS)',
+    footer: '自动刷新 · 数据来自 GitHub API (10 分钟缓存) 与本地监控',
+    loading: '加载中…', loadFailed: '加载失败: ',
+    star: 'Star', fork: 'Fork', views14: '浏览 14d', clones14: 'Clone 14d',
+    uniqVisitors: '独立访客', uniqClones: '独立克隆', trend7: '近 7 天浏览趋势',
+    merged: '已合并', open: 'Open', closed: '已关闭', apiError: 'API 错误',
+    mergedAt: '合并于', comments: '评论', review: 'review',
+    host: '主机', uptime: '运行时长', load: '负载 1m / 5m', cpu: '核',
+    mem: '内存', disk: '磁盘', ghUpdated: 'GitHub 数据更新于', serverAt: '服务器',
+    selectAll: '全选', selectNone: '清空'
+  },
+  en: {
+    title: 'My Dashboard', monitor: 'Monitor', ghProjects: 'GitHub Projects',
+    prs: 'Pull Requests', server: 'Server (ECS)',
+    footer: 'Auto-refresh · Data from GitHub API (10 min cache) & local monitoring',
+    loading: 'Loading…', loadFailed: 'Load failed: ',
+    star: 'Stars', fork: 'Forks', views14: 'Views 14d', clones14: 'Clones 14d',
+    uniqVisitors: 'Unique visitors', uniqClones: 'Unique cloners', trend7: 'Views last 7 days',
+    merged: 'Merged', open: 'Open', closed: 'Closed', apiError: 'API error',
+    mergedAt: 'merged', comments: 'comments', review: 'reviews',
+    host: 'Host', uptime: 'Uptime', load: 'Load 1m / 5m', cpu: 'cores',
+    mem: 'Memory', disk: 'Disk', ghUpdated: 'GitHub data updated', serverAt: 'Server',
+    selectAll: 'All', selectNone: 'None'
+  }
+};
+function t(k) { return (I18N[LANG] || I18N.zh)[k] || k; }
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.getAttribute('data-i18n')); });
+  document.getElementById('langBtn').textContent = LANG === 'zh' ? 'EN' : '中文';
+}
+document.getElementById('langBtn').addEventListener('click', () => {
+  LANG = LANG === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('dash-lang', LANG);
+  applyI18n();
+  load();
+});
 
 function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function timeAgo(iso) {
@@ -139,17 +203,18 @@ function renderProjects(list) {
   $('projects').innerHTML = list.map(p => {
     const err = p.error ? `<div class="err">⚠️ ${esc(p.error)}</div>` : '';
     const d = p.data || {};
-    const cls = p.error ? 'error' : 'merged';
+    const name = LANG === 'zh' ? (p.name || p.nameEn) : (p.nameEn || p.name);
+    const desc = LANG === 'zh' ? (p.desc || p.descEn) : (p.descEn || p.desc);
     return `<div class="card">
-      <h2>${p.icon || '📦'} <a href="${esc(p.url)}" target="_blank" style="color:var(--text);text-decoration:none">${esc(p.name)}</a></h2>
-      <div class="desc">${esc(p.desc || '')}</div>
+      <h2>${p.icon || '📦'} <a href="${esc(p.url)}" target="_blank" style="color:var(--text);text-decoration:none">${esc(name)}</a></h2>
+      <div class="desc">${esc(desc || '')}</div>
       ${err || `<div class="stats">
-        ${statCard(d.stars ?? '—', 'Star', 'accent')}
-        ${statCard(d.forks ?? '—', 'Fork')}
-        ${statCard(d.views14d ?? '—', '浏览 14d')}
-        ${statCard(d.clones14d ?? '—', 'Clone 14d')}
+        ${statCard(d.stars ?? '—', t('star'), 'accent')}
+        ${statCard(d.forks ?? '—', t('fork'))}
+        ${statCard(d.views14d ?? '—', t('views14'))}
+        ${statCard(d.clones14d ?? '—', t('clones14'))}
       </div>
-      <div class="desc">👀 独立访客: <b>${d.viewsUniques ?? '—'}</b> · 独立克隆: <b>${d.clonesUniques ?? '—'}</b> · 近 7 天浏览趋势:</div>
+      <div class="desc">👀 ${t('uniqVisitors')}: <b>${d.viewsUniques ?? '—'}</b> · ${t('uniqClones')}: <b>${d.clonesUniques ?? '—'}</b> · ${t('trend7')}:</div>
       ${sparkline(d.viewsDaily)}`}
     </div>`;
   }).join('');
@@ -158,10 +223,11 @@ function renderProjects(list) {
 function renderPRs(list) {
   $('prs').innerHTML = list.map(p => {
     const d = p.data || {};
-    let pill = `<span class="pill ${p.error ? 'error' : d.merged ? 'merged' : d.state}">${p.error ? 'API 错误' : d.merged ? '已合并' : d.state === 'open' ? 'Open' : '已关闭'}</span>`;
-    const meta = p.error ? '' : d.mergedAt ? `合并于 ${timeAgo(d.mergedAt)}` : d.state === 'open' ? `${d.comments ?? 0} 评论 · ${d.reviews ?? 0} review` : '';
+    const name = LANG === 'zh' ? (p.name || p.nameEn) : (p.nameEn || p.name);
+    let pill = `<span class="pill ${p.error ? 'error' : d.merged ? 'merged' : d.state}">${p.error ? t('apiError') : d.merged ? t('merged') : d.state === 'open' ? t('open') : t('closed')}</span>`;
+    const meta = p.error ? '' : d.mergedAt ? `${t('mergedAt')} ${timeAgo(d.mergedAt)}` : d.state === 'open' ? `${d.comments ?? 0} ${t('comments')} · ${d.reviews ?? 0} ${t('review')}` : '';
     return `<div class="pr">
-      <div><div class="t"><a href="${esc(p.url)}" target="_blank" style="color:var(--text);text-decoration:none">${esc(p.name)}</a></div>
+      <div><div class="t"><a href="${esc(p.url)}" target="_blank" style="color:var(--text);text-decoration:none">${esc(name)}</a></div>
       <div class="meta">${esc(p.repo)} #${p.num}${meta ? ' · ' + meta : ''}</div></div>
       ${pill}
     </div>`;
@@ -173,36 +239,81 @@ function renderServer(s) {
   const diskCls = s.disk.pct > 85 ? 'red' : s.disk.pct > 60 ? 'yellow' : 'green';
   $('server').innerHTML = `
     <div class="serv">
-      ${statCard(s.hostname, '主机', 'accent')}
-      ${statCard(s.uptime, '运行时长')}
-      ${statCard(s.load1 + ' / ' + s.load5, '负载 1m / 5m')}
-      ${statCard(s.cores + ' 核', 'CPU')}
+      ${statCard(s.hostname, t('host'), 'accent')}
+      ${statCard(s.uptime, t('uptime'))}
+      ${statCard(s.load1 + ' / ' + s.load5, t('load'))}
+      ${statCard(s.cores + ' ' + t('cpu'), 'CPU')}
     </div>
     <div class="stats">
-      ${statCard(s.mem.pct + '%', '内存 ' + s.mem.usedMB + 'MB / ' + s.mem.totalMB + 'MB', memCls)}
-      ${statCard(s.disk.pct + '%', '磁盘 ' + s.disk.usedGB + 'G / ' + s.disk.totalGB + 'G', diskCls)}
+      ${statCard(s.mem.pct + '%', t('mem') + ' ' + s.mem.usedMB + 'MB / ' + s.mem.totalMB + 'MB', memCls)}
+      ${statCard(s.disk.pct + '%', t('disk') + ' ' + s.disk.usedGB + 'G / ' + s.disk.totalGB + 'G', diskCls)}
     </div>
     <div class="bar"><div style="width:${s.mem.pct}%;background:${memCls==='green'?'var(--green)':memCls==='yellow'?'var(--yellow)':'var(--red)'}"></div></div>
     <div class="bar"><div style="width:${s.disk.pct}%;background:${diskCls==='green'?'var(--green)':diskCls==='yellow'?'var(--yellow)':'var(--red)'}"></div></div>`;
+}
+
+// ---------- 项目选择 ----------
+async function loadProjects() {
+  try {
+    const apiBase = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
+    const r = await fetch(apiBase + 'api/projects', { cache: 'no-store' });
+    const list = await r.json();
+    // 默认全选
+    if (!selectedKeys) selectedKeys = list.map(p => p.key);
+    const chips = list.map(p => {
+      const name = LANG === 'zh' ? p.name : p.nameEn;
+      const on = selectedKeys.includes(p.key);
+      return `<span class="chip ${on ? 'on' : ''}" data-key="${esc(p.key)}" data-name="${esc(name)}">${on ? '☑ ' : '☐ '}${esc(name)}</span>`;
+    }).join('');
+    const all = `<span class="chip" id="chipAll">${t('selectAll')}</span>`;
+    const none = `<span class="chip" id="chipNone">${t('selectNone')}</span>`;
+    $('chips').innerHTML = all + none + chips;
+    // 点击事件
+    $('chips').querySelectorAll('.chip[data-key]').forEach(c => {
+      c.addEventListener('click', () => {
+        const k = c.getAttribute('data-key');
+        if (selectedKeys.includes(k)) selectedKeys = selectedKeys.filter(x => x !== k);
+        else selectedKeys.push(k);
+        localStorage.setItem('dash-projects', JSON.stringify(selectedKeys));
+        renderChips();
+        load();
+      });
+    });
+    $('chipAll').addEventListener('click', () => { selectedKeys = list.map(p => p.key); localStorage.setItem('dash-projects', JSON.stringify(selectedKeys)); renderChips(); load(); });
+    $('chipNone').addEventListener('click', () => { selectedKeys = []; localStorage.setItem('dash-projects', JSON.stringify(selectedKeys)); renderChips(); load(); });
+  } catch (e) {
+    $('chips').textContent = '—';
+  }
+}
+function renderChips() {
+  document.querySelectorAll('.chip[data-key]').forEach(c => {
+    const on = selectedKeys.includes(c.getAttribute('data-key'));
+    c.classList.toggle('on', on);
+    const name = c.getAttribute('data-name');
+    c.textContent = (on ? '☑ ' : '☐ ') + name;
+  });
 }
 
 async function load() {
   try {
     // 动态计算 API 基路径: 兼容 /dashboard/ 和 /dashboard 两种访问方式
     const apiBase = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
-    const r = await fetch(apiBase + 'api/data', { cache: 'no-store' });
+    const qs = selectedKeys && selectedKeys.length ? '?projects=' + encodeURIComponent(selectedKeys.join(',')) : '';
+    const r = await fetch(apiBase + 'api/data' + qs, { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     gCacheMs = d.cacheMs || 600000;
-    $('sub').textContent = 'GitHub 数据更新于 ' + timeAgo(d.github.fetchedAt) + ' · 服务器 ' + new Date(d.server.time).toLocaleString('zh-CN');
+    $('sub').textContent = t('ghUpdated') + ' ' + timeAgo(d.github.fetchedAt) + ' · ' + t('serverAt') + ' ' + new Date(d.server.time).toLocaleString(LANG === 'zh' ? 'zh-CN' : 'en-US');
     $('badge').textContent = '⭐ ' + d.github.projects.reduce((a,p) => a + (p.data?.stars || 0), 0) + ' · 👀 ' + d.github.projects.reduce((a,p) => a + (p.data?.viewsUniques || 0), 0);
     renderProjects(d.github.projects);
     renderPRs(d.github.prs);
     renderServer(d.server);
   } catch (e) {
-    $('sub').textContent = '加载失败: ' + e.message;
+    $('sub').textContent = t('loadFailed') + e.message;
   }
 }
+applyI18n();
+loadProjects();
 load();
 setInterval(load, 60000);
 
