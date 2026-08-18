@@ -6,7 +6,8 @@
 
 A personal dashboard for GitHub project stats + PR status + server monitoring, built with zero-dependency Node.js.
 
-**在线演示 / Live demo**: <http://47.95.229.49:8080/dashboard/>
+> 部署在自己服务器上，通过 Caddy 反代访问（见下方部署）。
+> Self-hosted behind a Caddy reverse proxy (see Deploy below).
 
 ---
 
