@@ -5,7 +5,6 @@
  *
  * 功能:
  *  - GitHub 仓库状态 (star/fork/watch/浏览/clone) + PR 状态
- *  - 服务器监控 (内存/磁盘/负载/uptime)
  *
  * 环境变量:
  *  GH_TOKEN   GitHub classic token (读取 traffic 必需)
@@ -15,7 +14,6 @@
 
 const http = require('http');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 
 const PORT = parseInt(process.env.PORT || '18792', 10);
@@ -152,41 +150,6 @@ async function refreshGitHub(projects) {
   console.log('[dashboard] GitHub 数据刷新完成', new Date().toISOString());
 }
 
-// ---------- 服务器监控 ----------
-function readMem() {
-  const s = fs.readFileSync('/proc/meminfo', 'utf8');
-  const map = {};
-  for (const line of s.split('\n')) {
-    const i = line.indexOf(':');
-    if (i > 0) map[line.slice(0, i)] = parseInt(line.slice(i + 1), 10) || 0;
-  }
-  const total = map['MemTotal'] || 0, avail = map['MemAvailable'] || map['MemFree'] || 0;
-  return { totalMB: Math.round(total / 1024), usedMB: Math.round((total - avail) / 1024), pct: Math.round((total - avail) / total * 100) };
-}
-
-function readDisk() {
-  const out = require('child_process').execFileSync('df', ['-k', '/'], { encoding: 'utf8' });
-  const parts = out.trim().split(/\s+/);
-  const total = parseInt(parts[8], 10), used = parseInt(parts[9], 10);
-  return { totalGB: +(total / 1048576).toFixed(1), usedGB: +(used / 1048576).toFixed(1), pct: Math.round(used / total * 100) };
-}
-
-function serverStatus() {
-  const load = os.loadavg();
-  const up = os.uptime();
-  const upStr = up > 86400 ? Math.floor(up / 86400) + 'd ' + Math.floor(up % 86400 / 3600) + 'h'
-    : up > 3600 ? Math.floor(up / 3600) + 'h ' + Math.floor(up % 3600 / 60) + 'm'
-    : Math.floor(up / 60) + 'm';
-  return {
-    hostname: os.hostname(),
-    load1: +load[0].toFixed(2), load5: +load[1].toFixed(2), load15: +load[2].toFixed(2),
-    uptime: upStr, cores: os.cpus().length,
-    mem: readMem(), disk: readDisk(),
-    node: process.version,
-    time: new Date().toISOString()
-  };
-}
-
 // ---------- HTTP ----------
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
@@ -215,7 +178,7 @@ const server = http.createServer((req, res) => {
     } else {
       refreshGitHub(q && list.length ? list : undefined); // 首次: 后台刷
     }
-    const body = JSON.stringify({ github: { projects, prs, fetchedAt }, server: serverStatus(), cacheMs: CACHE_MS });
+    const body = JSON.stringify({ github: { projects, prs, fetchedAt }, cacheMs: CACHE_MS });
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(body);
     return;

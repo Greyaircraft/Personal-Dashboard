@@ -81,7 +81,6 @@
   .pill.closed { background: rgba(139,148,158,.15); color: var(--dim); }
   .pill.merged { background: rgba(130,80,223,.25); color: var(--purple); }
   .pill.error { background: rgba(248,81,73,.15); color: var(--red); }
-  .serv { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
   .footer { color: var(--dim); font-size: 12px; margin-top: 24px; text-align: center; }
   .spark { display: flex; align-items: flex-end; gap: 3px; height: 34px; margin-top: 4px; }
   .spark i { flex: 1; background: var(--accent); opacity: .55; border-radius: 2px 2px 0 0; min-height: 2px; }
@@ -127,10 +126,7 @@
 <h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🔄 <span data-i18n="prs">Pull Requests</span></h2>
 <div class="grid"><div class="card" id="prs">加载中…</div></div>
 
-<h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🖥️ <span data-i18n="server">服务器 (ECS)</span></h2>
-<div class="grid"><div class="card" id="server">加载中…</div></div>
-
-<div class="footer" data-i18n="footer">自动刷新 · 数据来自 GitHub API (10 分钟缓存) 与本地监控</div>
+<div class="footer" data-i18n="footer">自动刷新 · 数据来自 GitHub API (10 分钟缓存)</div>
 
 <script>
 const $ = id => document.getElementById(id);
@@ -142,28 +138,26 @@ let selectedKeys = null;
 const I18N = {
   zh: {
     title: '我的仪表盘', monitor: '监控项目', ghProjects: 'GitHub 项目',
-    prs: 'Pull Requests', server: '服务器 (ECS)',
-    footer: '自动刷新 · 数据来自 GitHub API (10 分钟缓存) 与本地监控',
+    prs: 'Pull Requests',
+    footer: '自动刷新 · 数据来自 GitHub API (10 分钟缓存)',
     loading: '加载中…', loadFailed: '加载失败: ',
     star: 'Star', fork: 'Fork', views14: '浏览 14d', clones14: 'Clone 14d',
     uniqVisitors: '独立访客', uniqClones: '独立克隆', trend7: '近 7 天浏览趋势',
     merged: '已合并', open: 'Open', closed: '已关闭', apiError: 'API 错误',
     mergedAt: '合并于', comments: '评论', review: 'review',
-    host: '主机', uptime: '运行时长', load: '负载 1m / 5m', cpu: '核',
-    mem: '内存', disk: '磁盘', ghUpdated: 'GitHub 数据更新于', serverAt: '服务器',
+    ghUpdated: 'GitHub 数据更新于',
     selectAll: '全选', selectNone: '清空'
   },
   en: {
     title: 'My Dashboard', monitor: 'Monitor', ghProjects: 'GitHub Projects',
-    prs: 'Pull Requests', server: 'Server (ECS)',
-    footer: 'Auto-refresh · Data from GitHub API (10 min cache) & local monitoring',
+    prs: 'Pull Requests',
+    footer: 'Auto-refresh · Data from GitHub API (10 min cache)',
     loading: 'Loading…', loadFailed: 'Load failed: ',
     star: 'Stars', fork: 'Forks', views14: 'Views 14d', clones14: 'Clones 14d',
     uniqVisitors: 'Unique visitors', uniqClones: 'Unique cloners', trend7: 'Views last 7 days',
     merged: 'Merged', open: 'Open', closed: 'Closed', apiError: 'API error',
     mergedAt: 'merged', comments: 'comments', review: 'reviews',
-    host: 'Host', uptime: 'Uptime', load: 'Load 1m / 5m', cpu: 'cores',
-    mem: 'Memory', disk: 'Disk', ghUpdated: 'GitHub data updated', serverAt: 'Server',
+    ghUpdated: 'GitHub data updated',
     selectAll: 'All', selectNone: 'None'
   }
 };
@@ -234,24 +228,6 @@ function renderPRs(list) {
   }).join('');
 }
 
-function renderServer(s) {
-  const memCls = s.mem.pct > 85 ? 'red' : s.mem.pct > 60 ? 'yellow' : 'green';
-  const diskCls = s.disk.pct > 85 ? 'red' : s.disk.pct > 60 ? 'yellow' : 'green';
-  $('server').innerHTML = `
-    <div class="serv">
-      ${statCard(s.hostname, t('host'), 'accent')}
-      ${statCard(s.uptime, t('uptime'))}
-      ${statCard(s.load1 + ' / ' + s.load5, t('load'))}
-      ${statCard(s.cores + ' ' + t('cpu'), 'CPU')}
-    </div>
-    <div class="stats">
-      ${statCard(s.mem.pct + '%', t('mem') + ' ' + s.mem.usedMB + 'MB / ' + s.mem.totalMB + 'MB', memCls)}
-      ${statCard(s.disk.pct + '%', t('disk') + ' ' + s.disk.usedGB + 'G / ' + s.disk.totalGB + 'G', diskCls)}
-    </div>
-    <div class="bar"><div style="width:${s.mem.pct}%;background:${memCls==='green'?'var(--green)':memCls==='yellow'?'var(--yellow)':'var(--red)'}"></div></div>
-    <div class="bar"><div style="width:${s.disk.pct}%;background:${diskCls==='green'?'var(--green)':diskCls==='yellow'?'var(--yellow)':'var(--red)'}"></div></div>`;
-}
-
 // ---------- 项目选择 ----------
 async function loadProjects() {
   try {
@@ -303,11 +279,10 @@ async function load() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     gCacheMs = d.cacheMs || 600000;
-    $('sub').textContent = t('ghUpdated') + ' ' + timeAgo(d.github.fetchedAt) + ' · ' + t('serverAt') + ' ' + new Date(d.server.time).toLocaleString(LANG === 'zh' ? 'zh-CN' : 'en-US');
+    $('sub').textContent = t('ghUpdated') + ' ' + timeAgo(d.github.fetchedAt);
     $('badge').textContent = '⭐ ' + d.github.projects.reduce((a,p) => a + (p.data?.stars || 0), 0) + ' · 👀 ' + d.github.projects.reduce((a,p) => a + (p.data?.viewsUniques || 0), 0);
     renderProjects(d.github.projects);
     renderPRs(d.github.prs);
-    renderServer(d.server);
   } catch (e) {
     $('sub').textContent = t('loadFailed') + e.message;
   }
