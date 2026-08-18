@@ -12,6 +12,7 @@
     --green: #3fb950; --red: #f85149; --yellow: #d29922;
     --stat-bg: rgba(255,255,255,.04); --bar-bg: rgba(255,255,255,.08);
     --purple: #bc8cff;
+    --contrib-0: #21262d; --contrib-1: #03396b; --contrib-2: #0d5f9c; --contrib-3: #1f8fd6; --contrib-4: #79c0ff;
   }
   /* 浅色 */
   @media (prefers-color-scheme: light) {
@@ -21,6 +22,7 @@
       --green: #1a7f37; --red: #cf222e; --yellow: #9a6700;
       --stat-bg: rgba(9,30,66,.05); --bar-bg: rgba(9,30,66,.08);
       --purple: #8250df;
+      --contrib-0: #ebedf0; --contrib-1: #9be9a8; --contrib-2: #40c463; --contrib-3: #30a14e; --contrib-4: #216e39;
     }
   }
   /* 手动切到深色 */
@@ -30,6 +32,7 @@
     --green: #3fb950; --red: #f85149; --yellow: #d29922;
     --stat-bg: rgba(255,255,255,.04); --bar-bg: rgba(255,255,255,.08);
     --purple: #bc8cff;
+    --contrib-0: #21262d; --contrib-1: #03396b; --contrib-2: #0d5f9c; --contrib-3: #1f8fd6; --contrib-4: #79c0ff;
   }
   /* 手动切到浅色 */
   :root[data-theme="light"] {
@@ -38,6 +41,7 @@
     --green: #1a7f37; --red: #cf222e; --yellow: #9a6700;
     --stat-bg: rgba(9,30,66,.05); --bar-bg: rgba(9,30,66,.08);
     --purple: #8250df;
+    --contrib-0: #ebedf0; --contrib-1: #9be9a8; --contrib-2: #40c463; --contrib-3: #30a14e; --contrib-4: #216e39;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -100,6 +104,20 @@
   }
   .lang-btn:hover { background: var(--bar-bg); }
   .i18n[data-i18n] { transition: opacity .15s; }
+  /* 贡献热力图 */
+  .heat { display: grid; grid-auto-flow: column; grid-auto-columns: 11px; gap: 3px; }
+  .heat .col { display: flex; flex-direction: column; gap: 3px; }
+  .heat .day { width: 11px; height: 11px; border-radius: 2px; background: var(--contrib-0, #ebedf0); }
+  .heat .day[data-l="1"] { background: var(--contrib-1, #9be9a8); }
+  .heat .day[data-l="2"] { background: var(--contrib-2, #40c463); }
+  .heat .day[data-l="3"] { background: var(--contrib-3, #30a14e); }
+  .heat .day[data-l="4"] { background: var(--contrib-4, #216e39); }
+  .heat .day:hover { outline: 1px solid var(--text); }
+  .lvl { width: 11px; height: 11px; border-radius: 2px; background: var(--contrib-0, #ebedf0); display: inline-block; }
+  .lvl[data-l="1"] { background: var(--contrib-1, #9be9a8); }
+  .lvl[data-l="2"] { background: var(--contrib-2, #40c463); }
+  .lvl[data-l="3"] { background: var(--contrib-3, #30a14e); }
+  .lvl[data-l="4"] { background: var(--contrib-4, #216e39); }
 </style>
 </head>
 <body>
@@ -126,6 +144,16 @@
 <h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🔄 <span data-i18n="prs">Pull Requests</span></h2>
 <div class="grid"><div class="card" id="prs">加载中…</div></div>
 
+<h2 style="font-size:15px;margin:22px 0 10px;color:var(--dim)">🔥 <span data-i18n="contrib">GitHub 贡献</span> <span id="contribTotal" style="color:var(--accent)"></span></h2>
+<div class="card">
+  <div id="contribHeat" style="overflow-x:auto;padding:4px 0">加载中…</div>
+  <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end;color:var(--dim);font-size:11px">
+    <span data-i18n="less">少</span>
+    <span class="lvl" data-l="0"></span><span class="lvl" data-l="1"></span><span class="lvl" data-l="2"></span><span class="lvl" data-l="3"></span><span class="lvl" data-l="4"></span>
+    <span data-i18n="more">多</span>
+  </div>
+</div>
+
 <div class="footer" data-i18n="footer">自动刷新 · 数据来自 GitHub API (10 分钟缓存)</div>
 
 <script>
@@ -145,7 +173,7 @@ const I18N = {
     uniqVisitors: '独立访客', uniqClones: '独立克隆', trend7: '近 7 天浏览趋势',
     merged: '已合并', open: 'Open', closed: '已关闭', apiError: 'API 错误',
     mergedAt: '合并于', comments: '评论', review: 'review',
-    ghUpdated: 'GitHub 数据更新于',
+    ghUpdated: 'GitHub 数据更新于', contrib: 'GitHub 贡献', less: '少', more: '多',
     selectAll: '全选', selectNone: '清空'
   },
   en: {
@@ -157,7 +185,7 @@ const I18N = {
     uniqVisitors: 'Unique visitors', uniqClones: 'Unique cloners', trend7: 'Views last 7 days',
     merged: 'Merged', open: 'Open', closed: 'Closed', apiError: 'API error',
     mergedAt: 'merged', comments: 'comments', review: 'reviews',
-    ghUpdated: 'GitHub data updated',
+    ghUpdated: 'GitHub data updated', contrib: 'GitHub Contributions', less: 'Less', more: 'More',
     selectAll: 'All', selectNone: 'None'
   }
 };
@@ -270,6 +298,31 @@ function renderChips() {
   });
 }
 
+// ---------- 贡献热力图 ----------
+async function renderContrib() {
+  const el = document.getElementById('contribHeat');
+  try {
+    const apiBase = location.pathname.endsWith('/') ? location.pathname : location.pathname + '/';
+    const r = await fetch(apiBase + 'api/contributions', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const totalEl = document.getElementById('contribTotal');
+    if (d.total != null) {
+      totalEl.textContent = (LANG === 'zh' ? '共 ' : '') + d.total + (LANG === 'zh' ? ' 次贡献' : ' contributions');
+    }
+    if (!d.weeks || !d.weeks.length) { el.innerHTML = '—'; return; }
+    // 只显示最近 26 周 (半年)
+    const weeks = d.weeks.slice(-26);
+    el.innerHTML = `<div class="heat">` + weeks.map(w =>
+      `<div class="col">` + w.days.map(day =>
+        `<span class="day" data-l="${day.level}" title="${esc(day.date)}: ${day.count} contributions"></span>`
+      ).join('') + `</div>`
+    ).join('') + `</div>`;
+  } catch (e) {
+    el.innerHTML = `<span class="err">⚠️ ${esc(e.message)}</span>`;
+  }
+}
+
 async function load() {
   try {
     // 动态计算 API 基路径: 兼容 /dashboard/ 和 /dashboard 两种访问方式
@@ -283,6 +336,7 @@ async function load() {
     $('badge').textContent = '⭐ ' + d.github.projects.reduce((a,p) => a + (p.data?.stars || 0), 0) + ' · 👀 ' + d.github.projects.reduce((a,p) => a + (p.data?.viewsUniques || 0), 0);
     renderProjects(d.github.projects);
     renderPRs(d.github.prs);
+    renderContrib();
   } catch (e) {
     $('sub').textContent = t('loadFailed') + e.message;
   }

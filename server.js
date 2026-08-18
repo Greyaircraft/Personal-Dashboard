@@ -20,6 +20,48 @@ const PORT = parseInt(process.env.PORT || '18792', 10);
 const CACHE_MS = parseInt(process.env.CACHE_MS || '600000', 10);
 const GH_TOKEN = process.env.GH_TOKEN || '';
 const GH_API = 'https://api.github.com';
+const GH_USER = 'Greyaircraft'; // 贡献图表显示的用户
+
+// ---------- GitHub GraphQL: 贡献日历 ----------
+async function fetchContributions() {
+  const query = `query($user: String!) {
+    user(login: $user) {
+      contributionsCollection {
+        contributionCalendar {
+          totalContributions
+          weeks {
+            contributionDays {
+              date
+              contributionCount
+            }
+          }
+        }
+      }
+    }
+  }`;
+  const res = await fetch('https://api.github.com/graphql', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + GH_TOKEN,
+      'Content-Type': 'application/json',
+      'User-Agent': 'personal-dashboard'
+    },
+    body: JSON.stringify({ query, variables: { user: GH_USER } }),
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!res.ok) throw new Error('graphql -> ' + res.status);
+  const json = await res.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  const cal = json.data.user.contributionsCollection.contributionCalendar;
+  // level: 0 / 1-3 / 4-6 / 7-9 / 10+ → 0..4
+  const lvl = c => c === 0 ? 0 : c <= 3 ? 1 : c <= 6 ? 2 : c <= 9 ? 3 : 4;
+  return {
+    total: cal.totalContributions,
+    weeks: cal.weeks.map(w => ({
+      days: w.contributionDays.map(d => ({ date: d.date, count: d.contributionCount, level: lvl(d.contributionCount) }))
+    }))
+  };
+}
 
 // ---------- 配置: 可监控的全部项目 (前端可选择) ----------
 const ALL_PROJECTS = [
@@ -150,6 +192,21 @@ async function refreshGitHub(projects) {
   console.log('[dashboard] GitHub 数据刷新完成', new Date().toISOString());
 }
 
+// ---------- 贡献日历缓存 ----------
+let contribCache = null;
+let contribCacheAt = 0;
+const CONTRIB_CACHE_MS = 3600000; // 贡献数据 1 小时缓存
+
+async function refreshContrib() {
+  try {
+    contribCache = await fetchContributions();
+    contribCacheAt = Date.now();
+    console.log('[dashboard] 贡献数据刷新完成', new Date().toISOString());
+  } catch (e) {
+    console.log('[dashboard] 贡献数据刷新失败:', String(e.message || e));
+  }
+}
+
 // ---------- HTTP ----------
 const HTML = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
@@ -189,6 +246,12 @@ const server = http.createServer((req, res) => {
     res.end(body);
     return;
   }
+  if (url === '/api/contributions') {
+    const body = JSON.stringify(contribCache || { total: null, weeks: [], fetchedAt: contribCacheAt || null });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(body);
+    return;
+  }
   res.writeHead(404, { 'Content-Type': 'text/plain' });
   res.end('Not Found');
 });
@@ -199,4 +262,6 @@ server.listen(PORT, '127.0.0.1', () => {
 
 // ---------- 定时刷新 ----------
 refreshGitHub();
+refreshContrib();
 setInterval(refreshGitHub, CACHE_MS).unref();
+setInterval(refreshContrib, CONTRIB_CACHE_MS).unref();
